@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply bg-bg text-textp; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
