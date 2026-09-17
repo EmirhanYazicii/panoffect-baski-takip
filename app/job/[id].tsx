@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { colors, durumEtiketleri, radius, spacing } from "@/constants/theme";
 import { RezervasyonForm } from "@/components/forms/RezervasyonForm";
 import { GrafikForm } from "@/components/forms/GrafikForm";
 import { MetroForm } from "@/components/forms/MetroForm";
+import { teslimFormulariniUret, formuYazdir } from "@/lib/teslimFormu";
 import type {
   JobRow,
   RezervasyonDetayRow,
@@ -62,6 +63,23 @@ export default function IsDetayScreen() {
   const [revizeModalAcik, setRevizeModalAcik] = useState(false);
   const [revizeNotu, setRevizeNotu] = useState("");
   const [revizeGonderiliyor, setRevizeGonderiliyor] = useState(false);
+  const [yaziliyorBolge, setYaziliyorBolge] = useState<string | null>(null);
+
+  const teslimFormlari = useMemo(() => {
+    if (!job) return [];
+    return teslimFormulariniUret(job, rezervasyon, grafik, metro);
+  }, [job, rezervasyon, grafik, metro]);
+
+  const teslimFormunuAc = async (bolgeAdi: string | null, html: string) => {
+    setYaziliyorBolge(bolgeAdi ?? "tek");
+    try {
+      await formuYazdir(html);
+    } catch (e: any) {
+      Alert.alert("Hata", e?.message ?? "Teslim formu oluşturulamadı.");
+    } finally {
+      setYaziliyorBolge(null);
+    }
+  };
 
   const revizeyeGonderOnayla = async () => {
     if (!revizeNotu.trim()) {
@@ -130,6 +148,39 @@ export default function IsDetayScreen() {
         </Text>
         <Text style={styles.altBilgiMetni}>Baskı Merkezi: {job.baski_merkezi || "-"}</Text>
       </View>
+
+      {job.durum === "tamamlandi" && teslimFormlari.length === 1 && (
+        <TouchableOpacity
+          style={styles.teslimFormuButon}
+          onPress={() => teslimFormunuAc(teslimFormlari[0].bolgeAdi, teslimFormlari[0].html)}
+          disabled={yaziliyorBolge !== null}
+        >
+          {yaziliyorBolge !== null ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.teslimFormuMetni}>🖨️ Teslim Formunu Oluştur (PDF)</Text>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {job.durum === "tamamlandi" && teslimFormlari.length > 1 && (
+        <View style={styles.teslimFormuButonRow}>
+          {teslimFormlari.map((form) => (
+            <TouchableOpacity
+              key={form.bolgeAdi}
+              style={[styles.teslimFormuButon, styles.teslimFormuButonYarim]}
+              onPress={() => teslimFormunuAc(form.bolgeAdi, form.html)}
+              disabled={yaziliyorBolge !== null}
+            >
+              {yaziliyorBolge === form.bolgeAdi ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.teslimFormuMetni}>🖨️ {form.bolgeAdi} Formu</Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {job.revize_notu && job.durum === "revize_gerekiyor" && (
         <View style={styles.uyariKutu}>
@@ -276,6 +327,15 @@ const styles = StyleSheet.create({
   },
   uyariBaslik: { color: colors.danger, fontWeight: "700", fontSize: 13, marginBottom: 4 },
   uyariMetin: { color: colors.textPrimary, fontSize: 13 },
+  teslimFormuButon: {
+    backgroundColor: colors.navy,
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  teslimFormuButonRow: { flexDirection: "row", gap: spacing.sm },
+  teslimFormuButonYarim: { flex: 1 },
+  teslimFormuMetni: { color: colors.white, fontWeight: "700", fontSize: 14 },
   kart: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
